@@ -1,0 +1,42 @@
+# Credentials and secrets
+credentials/
+
+# Data files with sensitive info
+data/routers.json
+data/backup_log.json
+data/settings.json
+
+# Backups
+backups/
+mikrotik_backups/
+
+# Planning/context files
+plan.txt
+context/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Local config
+config.local.py

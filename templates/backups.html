@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Backup History - MikroTik Backup Manager{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Backup History</h1>
+</div>
+
+{% if logs %}
+<table class="table">
+    <thead>
+        <tr>
+            <th>Time</th>
+            <th>Router</th>
+            <th>Status</th>
+            <th>Message</th>
+            <th>Drive Link</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for log in logs|reverse %}
+        <tr class="{{ 'success' if log.success else 'error' }}">
+            <td>{{ log.timestamp[:19].replace('T', ' ') }}</td>
+            <td>{{ log.router_name }}</td>
+            <td>
+                <span class="badge badge-{{ 'success' if log.success else 'error' }}">
+                    {{ 'Success' if log.success else 'Failed' }}
+                </span>
+            </td>
+            <td>{{ log.message }}</td>
+            <td>
+                {% if log.drive_files %}
+                    {% for file in log.drive_files %}
+                    <a href="{{ file.link }}" target="_blank">{{ file.name }}</a>{% if not loop.last %}, {% endif %}
+                    {% endfor %}
+                {% elif log.drive_link %}
+                <a href="{{ log.drive_link }}" target="_blank">View</a>
+                {% elif log.drive_errors %}
+                <span class="text-error">{{ log.drive_errors|join(', ') }}</span>
+                {% elif log.drive_error %}
+                <span class="text-error">{{ log.drive_error }}</span>
+                {% else %}
+                -
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="empty-state">
+    <p>No backup history yet.</p>
+    <p>Run a backup from the <a href="{{ url_for('dashboard') }}">Routers</a> page to see results here.</p>
+</div>
+{% endif %}
+{% endblock %}

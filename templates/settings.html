@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - MikroTik Backup Manager{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Settings</h1>
+</div>
+
+<div class="form-container">
+    <form method="POST">
+        <h2>Backup Schedule</h2>
+
+        <div class="form-group">
+            <label class="checkbox-label">
+                <input type="checkbox" name="schedule_enabled" {% if settings.schedule_enabled %}checked{% endif %}>
+                Enable Automatic Backups
+            </label>
+        </div>
+
+        <div class="form-group">
+            <label for="schedule_type">Schedule Type</label>
+            <select id="schedule_type" name="schedule_type">
+                <option value="interval" {% if settings.schedule_type == 'interval' %}selected{% endif %}>Interval (every N hours)</option>
+                <option value="cron" {% if settings.schedule_type == 'cron' %}selected{% endif %}>Daily at specific time</option>
+            </select>
+        </div>
+
+        <div class="form-group schedule-interval">
+            <label for="schedule_interval_hours">Backup Every (hours)</label>
+            <input type="number" id="schedule_interval_hours" name="schedule_interval_hours"
+                   value="{{ settings.schedule_interval_hours }}" min="1" max="168">
+        </div>
+
+        <div class="form-row schedule-cron">
+            <div class="form-group">
+                <label for="schedule_cron_hour">Hour (0-23)</label>
+                <input type="number" id="schedule_cron_hour" name="schedule_cron_hour"
+                       value="{{ settings.schedule_cron_hour }}" min="0" max="23">
+            </div>
+            <div class="form-group">
+                <label for="schedule_cron_minute">Minute (0-59)</label>
+                <input type="number" id="schedule_cron_minute" name="schedule_cron_minute"
+                       value="{{ settings.schedule_cron_minute }}" min="0" max="59">
+            </div>
+        </div>
+
+        <hr>
+
+        <h2>Google Drive</h2>
+
+        <div class="gdrive-auth-section">
+            {% if gdrive_authorized %}
+            <div class="alert alert-success">
+                Google Drive is connected.
+            </div>
+            {% else %}
+            <div class="alert alert-warning">
+                Google Drive is not connected. Click the button below to authorize.
+            </div>
+            {% endif %}
+
+            <div class="form-actions" style="margin-bottom: 1.5rem;">
+                {% if gdrive_authorized %}
+                <a href="{{ url_for('gdrive_authorize') }}" class="btn btn-secondary">Re-authorize Google Drive</a>
+                {% else %}
+                <a href="{{ url_for('gdrive_authorize') }}" class="btn btn-primary">Authorize Google Drive</a>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="google_drive_folder_id">Google Drive Folder ID (optional)</label>
+            <input type="text" id="google_drive_folder_id" name="google_drive_folder_id"
+                   value="{{ settings.google_drive_folder_id }}" placeholder="Leave empty to upload to root">
+            <small>The folder ID from the Google Drive URL (after /folders/). Leave empty to upload to Drive root.</small>
+        </div>
+
+        <div class="form-group">
+            <label class="checkbox-label">
+                <input type="checkbox" name="delete_local_after_upload" {% if settings.delete_local_after_upload %}checked{% endif %}>
+                Delete local backup after successful upload
+            </label>
+        </div>
+
+        {% if gdrive_status %}
+        <div class="alert alert-{{ 'success' if gdrive_status.success else 'error' }}">
+            <strong>Google Drive Status:</strong> {{ gdrive_status.message }}
+        </div>
+        {% endif %}
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save Settings</button>
+            {% if gdrive_authorized %}
+            <button type="submit" name="test_gdrive" value="1" class="btn btn-secondary">Test Google Drive</button>
+            {% endif %}
+        </div>
+    </form>
+
+    {% if gdrive_authorized %}
+    <hr>
+    <form method="POST" action="{{ url_for('gdrive_revoke') }}" style="margin-top: 1rem;">
+        <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to revoke Google Drive access?');">
+            Revoke Google Drive Access
+        </button>
+    </form>
+    {% endif %}
+</div>
+
+<div class="info-box">
+    <h3>Google Drive Setup (OAuth2)</h3>
+    <ol>
+        <li>Go to <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a></li>
+        <li>Create a new project or select an existing one</li>
+        <li>Enable the <strong>Google Drive API</strong></li>
+        <li>Go to "Credentials" > "Create Credentials" > "OAuth client ID"</li>
+        <li>Select <strong>"Web application"</strong> as application type</li>
+        <li>Add authorized redirect URI: <code>http://localhost:5001/gdrive/callback</code></li>
+        <li>Download the JSON credentials file</li>
+        <li>Rename it to <code>client_secret.json</code> and place it in the <code>credentials/</code> folder</li>
+        <li>Click "Authorize Google Drive" above and grant access</li>
+    </ol>
+    <p><strong>Note:</strong> If using a different host/port, update the redirect URI in Google Cloud Console accordingly.</p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const scheduleType = document.getElementById('schedule_type');
+    const intervalFields = document.querySelector('.schedule-interval');
+    const cronFields = document.querySelector('.schedule-cron');
+
+    function updateVisibility() {
+        if (scheduleType.value === 'interval') {
+            intervalFields.style.display = 'block';
+            cronFields.style.display = 'none';
+        } else {
+            intervalFields.style.display = 'none';
+            cronFields.style.display = 'flex';
+        }
+    }
+
+    scheduleType.addEventListener('change', updateVisibility);
+    updateVisibility();
+});
+</script>
+{% endblock %}

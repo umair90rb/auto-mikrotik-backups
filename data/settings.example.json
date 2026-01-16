@@ -1,0 +1,9 @@
+{
+  "schedule_enabled": false,
+  "schedule_type": "interval",
+  "schedule_interval_hours": 24,
+  "schedule_cron_hour": 2,
+  "schedule_cron_minute": 0,
+  "google_drive_folder_id": "",
+  "delete_local_after_upload": false
+}

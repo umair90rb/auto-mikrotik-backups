@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - MikroTik Backup Manager{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Routers</h1>
+    <div class="header-actions">
+        <form method="POST" action="{{ url_for('backup_all') }}" style="display: inline;">
+            <button type="submit" class="btn btn-success" {% if not routers %}disabled{% endif %}>
+                Backup All
+            </button>
+        </form>
+        <a href="{{ url_for('add_router') }}" class="btn btn-primary">Add Router</a>
+    </div>
+</div>
+
+<div class="schedule-info">
+    {% if schedule_enabled and next_run %}
+    <div class="countdown-box">
+        <span class="countdown-label">Next scheduled backup in:</span>
+        <span id="countdown" class="countdown-timer">--:--:--</span>
+    </div>
+    {% else %}
+    <div class="countdown-box countdown-disabled">
+        <span class="countdown-label">Scheduled backup:</span>
+        <span class="countdown-timer">Disabled</span>
+        <a href="{{ url_for('settings') }}" class="btn btn-sm btn-secondary" style="margin-left: 1rem;">Enable</a>
+    </div>
+    {% endif %}
+</div>
+
+{% if routers %}
+<table class="table">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>IP Address</th>
+            <th>Username</th>
+            <th>Ports</th>
+            <th>Last Backup</th>
+            <th>Status</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for router in routers %}
+        {% set last_backup = last_backups.get(router.id) %}
+        <tr>
+            <td>{{ router.name }}</td>
+            <td>{{ router.ip }}</td>
+            <td>{{ router.username }}</td>
+            <td>API: {{ router.api_port }}, FTP: {{ router.ftp_port }}</td>
+            <td>
+                {% if last_backup %}
+                {{ last_backup.timestamp[:19].replace('T', ' ') }}
+                {% else %}
+                Never
+                {% endif %}
+            </td>
+            <td>
+                {% if last_backup %}
+                <span class="badge badge-{{ 'success' if last_backup.success else 'error' }}">
+                    {{ 'Success' if last_backup.success else 'Failed' }}
+                </span>
+                {% else %}
+                <span class="badge badge-secondary">-</span>
+                {% endif %}
+            </td>
+            <td class="actions">
+                <form method="POST" action="{{ url_for('backup_single', router_id=router.id) }}" style="display: inline;">
+                    <button type="submit" class="btn btn-sm btn-success">Backup</button>
+                </form>
+                <form method="POST" action="{{ url_for('test_router', router_id=router.id) }}" style="display: inline;">
+                    <button type="submit" class="btn btn-sm btn-secondary">Test</button>
+                </form>
+                <a href="{{ url_for('edit_router', router_id=router.id) }}" class="btn btn-sm btn-secondary">Edit</a>
+                <form method="POST" action="{{ url_for('delete_router', router_id=router.id) }}" style="display: inline;" onsubmit="return confirm('Delete this router?');">
+                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="empty-state">
+    <p>No routers configured yet.</p>
+    <a href="{{ url_for('add_router') }}" class="btn btn-primary">Add Your First Router</a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if schedule_enabled and next_run %}
+<script>
+(function() {
+    const nextRunTime = new Date("{{ next_run }}");
+    const countdownEl = document.getElementById('countdown');
+
+    function updateCountdown() {
+        const now = new Date();
+        const diff = nextRunTime - now;
+
+        if (diff <= 0) {
+            countdownEl.textContent = "Running...";
+            countdownEl.classList.add('countdown-running');
+            // Refresh page after a short delay to show updated status
+            setTimeout(() => location.reload(), 10000);
+            return;
+        }
+
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+        countdownEl.textContent =
+            String(hours).padStart(2, '0') + ':' +
+            String(minutes).padStart(2, '0') + ':' +
+            String(seconds).padStart(2, '0');
+    }
+
+    updateCountdown();
+    setInterval(updateCountdown, 1000);
+})();
+</script>
+{% endif %}
+{% endblock %}
