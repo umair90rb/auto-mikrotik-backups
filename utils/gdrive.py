@@ -1,6 +1,10 @@
 """
 Google Drive Upload Utility
 Uses OAuth2 authentication (user login flow)
+
+Supports both file-based and environment variable credentials:
+- GOOGLE_CLIENT_SECRET: JSON string of client_secret.json contents
+- GOOGLE_TOKEN: JSON string of token.json contents (for persistent auth)
 """
 import os
 import json
@@ -20,6 +24,55 @@ CLIENT_SECRET_FILE = os.path.join(CREDENTIALS_DIR, 'client_secret.json')
 TOKEN_FILE = os.path.join(CREDENTIALS_DIR, 'token.json')
 
 
+def get_client_secret():
+    """Get client secret from file or environment variable."""
+    # Try environment variable first
+    env_secret = os.environ.get('GOOGLE_CLIENT_SECRET')
+    if env_secret:
+        try:
+            return json.loads(env_secret)
+        except json.JSONDecodeError:
+            pass
+
+    # Fall back to file
+    if os.path.exists(CLIENT_SECRET_FILE):
+        with open(CLIENT_SECRET_FILE, 'r') as f:
+            return json.load(f)
+
+    return None
+
+
+def get_token():
+    """Get token from file or environment variable."""
+    # Try environment variable first
+    env_token = os.environ.get('GOOGLE_TOKEN')
+    if env_token:
+        try:
+            return json.loads(env_token)
+        except json.JSONDecodeError:
+            pass
+
+    # Fall back to file
+    if os.path.exists(TOKEN_FILE):
+        with open(TOKEN_FILE, 'r') as f:
+            return json.load(f)
+
+    return None
+
+
+def save_token(token_data):
+    """Save token to file and print for env var setup."""
+    os.makedirs(CREDENTIALS_DIR, exist_ok=True)
+
+    # Save to file
+    with open(TOKEN_FILE, 'w') as f:
+        json.dump(token_data, f)
+
+    # Print for environment variable setup (useful for deployment)
+    print("\n[Google Drive] Token saved. For deployment, set this environment variable:")
+    print(f"GOOGLE_TOKEN={json.dumps(token_data)}\n")
+
+
 class GoogleDriveClient:
     def __init__(self):
         self.service = None
@@ -33,12 +86,13 @@ class GoogleDriveClient:
         Returns:
             tuple: (success, auth_url or error_message)
         """
-        if not os.path.exists(CLIENT_SECRET_FILE):
-            return False, "Client secret file not found. Please download OAuth2 credentials from Google Cloud Console."
+        client_config = get_client_secret()
+        if not client_config:
+            return False, "Client secret not found. Set GOOGLE_CLIENT_SECRET env var or add client_secret.json file."
 
         try:
-            flow = Flow.from_client_secrets_file(
-                CLIENT_SECRET_FILE,
+            flow = Flow.from_client_config(
+                client_config,
                 scopes=SCOPES,
                 redirect_uri=redirect_uri
             )
@@ -62,23 +116,23 @@ class GoogleDriveClient:
         Returns:
             tuple: (success, message)
         """
-        if not os.path.exists(CLIENT_SECRET_FILE):
-            return False, "Client secret file not found"
+        client_config = get_client_secret()
+        if not client_config:
+            return False, "Client secret not found"
 
         try:
-            flow = Flow.from_client_secrets_file(
-                CLIENT_SECRET_FILE,
+            flow = Flow.from_client_config(
+                client_config,
                 scopes=SCOPES,
                 redirect_uri=redirect_uri
             )
             flow.fetch_token(authorization_response=authorization_response)
 
             credentials = flow.credentials
+            token_data = json.loads(credentials.to_json())
 
             # Save the token
-            os.makedirs(CREDENTIALS_DIR, exist_ok=True)
-            with open(TOKEN_FILE, 'w') as token:
-                token.write(credentials.to_json())
+            save_token(token_data)
 
             self._initialized = False  # Reset to force re-init with new token
             return True, "Google Drive authorized successfully!"
@@ -87,9 +141,10 @@ class GoogleDriveClient:
 
     def is_authorized(self):
         """Check if we have valid credentials."""
-        if os.path.exists(TOKEN_FILE):
+        token_data = get_token()
+        if token_data:
             try:
-                creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
+                creds = Credentials.from_authorized_user_info(token_data, SCOPES)
                 return creds and creds.valid or (creds and creds.expired and creds.refresh_token)
             except Exception:
                 return False
@@ -100,19 +155,20 @@ class GoogleDriveClient:
         if self._initialized and self.service:
             return True, None
 
-        if not os.path.exists(TOKEN_FILE):
+        token_data = get_token()
+        if not token_data:
             self._error = "Not authorized. Please authorize Google Drive access first."
             return False, self._error
 
         try:
-            creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
+            creds = Credentials.from_authorized_user_info(token_data, SCOPES)
 
             # Refresh token if expired
             if creds and creds.expired and creds.refresh_token:
                 creds.refresh(Request())
                 # Save refreshed token
-                with open(TOKEN_FILE, 'w') as token:
-                    token.write(creds.to_json())
+                refreshed_data = json.loads(creds.to_json())
+                save_token(refreshed_data)
 
             if not creds or not creds.valid:
                 self._error = "Invalid credentials. Please re-authorize Google Drive access."

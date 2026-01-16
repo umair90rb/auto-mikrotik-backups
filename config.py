@@ -5,7 +5,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Flask settings
 SECRET_KEY = os.environ.get('SECRET_KEY', 'change-this-secret-key-in-production')
-DEBUG = os.environ.get('FLASK_DEBUG', 'True').lower() == 'true'
+DEBUG = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
+PORT = int(os.environ.get('PORT', 5000))
 
 # Admin credentials
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', 'admin')
@@ -20,8 +21,9 @@ BACKUP_LOG_FILE = os.path.join(DATA_DIR, 'backup_log.json')
 # Backup directory
 BACKUP_DIR = os.path.join(BASE_DIR, 'backups')
 
-# Google Drive credentials
-GOOGLE_CREDENTIALS_FILE = os.path.join(BASE_DIR, 'credentials', 'google_service_account.json')
+# Google Drive OAuth2 credentials (can be set via environment variables)
+# GOOGLE_CLIENT_SECRET - JSON string of client_secret.json
+# GOOGLE_TOKEN - JSON string of token.json (after authorization)
 
 # Default settings
 DEFAULT_SETTINGS = {
