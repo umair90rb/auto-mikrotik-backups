@@ -135,6 +135,82 @@ def add_router():
     return render_template('add_router.html', router=None)
 
 
+@app.route('/router/bulk-upload', methods=['GET', 'POST'])
+@login_required
+def bulk_upload():
+    if request.method == 'POST':
+        # Check if file was uploaded
+        if 'file' not in request.files:
+            flash('No file selected', 'error')
+            return redirect(url_for('bulk_upload'))
+
+        file = request.files['file']
+        if file.filename == '':
+            flash('No file selected', 'error')
+            return redirect(url_for('bulk_upload'))
+
+        if not file.filename.endswith('.json'):
+            flash('Please upload a JSON file', 'error')
+            return redirect(url_for('bulk_upload'))
+
+        try:
+            # Parse JSON content
+            content = file.read().decode('utf-8')
+            new_routers = json.loads(content)
+
+            if not isinstance(new_routers, list):
+                flash('JSON must be an array of routers', 'error')
+                return redirect(url_for('bulk_upload'))
+
+            # Validate and add routers
+            routers = load_routers()
+            existing_ips = {r['ip'] for r in routers}
+            added = 0
+            skipped = 0
+
+            for router_data in new_routers:
+                # Validate required fields
+                if not all(key in router_data for key in ['name', 'ip', 'username', 'password']):
+                    skipped += 1
+                    continue
+
+                # Skip if IP already exists
+                if router_data['ip'] in existing_ips:
+                    skipped += 1
+                    continue
+
+                router = {
+                    'id': str(uuid.uuid4()),
+                    'name': router_data['name'],
+                    'ip': router_data['ip'],
+                    'username': router_data['username'],
+                    'password': router_data['password'],
+                    'api_port': int(router_data.get('api_port', 8728)),
+                    'ftp_port': int(router_data.get('ftp_port', 21))
+                }
+                routers.append(router)
+                existing_ips.add(router['ip'])
+                added += 1
+
+            save_routers(routers)
+
+            if added > 0:
+                flash(f'Successfully added {added} router(s)', 'success')
+            if skipped > 0:
+                flash(f'Skipped {skipped} router(s) (duplicate IP or missing fields)', 'warning')
+
+            return redirect(url_for('dashboard'))
+
+        except json.JSONDecodeError:
+            flash('Invalid JSON file', 'error')
+            return redirect(url_for('bulk_upload'))
+        except Exception as e:
+            flash(f'Error processing file: {str(e)}', 'error')
+            return redirect(url_for('bulk_upload'))
+
+    return render_template('bulk_upload.html')
+
+
 @app.route('/router/<router_id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_router(router_id):

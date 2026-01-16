@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Bulk Upload Routers - MikroTik Backup Manager{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Bulk Upload Routers</h1>
+</div>
+
+<div class="form-container">
+    <form method="POST" enctype="multipart/form-data">
+        <div class="form-group">
+            <label for="file">Select JSON File</label>
+            <input type="file" id="file" name="file" accept=".json" required>
+            <small>Upload a JSON file containing an array of routers</small>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Upload & Import</button>
+            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<div class="info-box">
+    <h3>JSON Format</h3>
+    <p>The JSON file should be an array of router objects with the following format:</p>
+    <pre><code>[
+  {
+    "name": "Router Name",
+    "ip": "192.168.1.1",
+    "username": "admin",
+    "password": "your-password",
+    "api_port": 8728,
+    "ftp_port": 21
+  },
+  {
+    "name": "Another Router",
+    "ip": "192.168.1.2",
+    "username": "admin",
+    "password": "password123",
+    "api_port": 8728,
+    "ftp_port": 21
+  }
+]</code></pre>
+    <p><strong>Required fields:</strong> name, ip, username, password</p>
+    <p><strong>Optional fields:</strong> api_port (default: 8728), ftp_port (default: 21)</p>
+    <p><strong>Note:</strong> Routers with duplicate IPs will be skipped.</p>
+</div>
+{% endblock %}
