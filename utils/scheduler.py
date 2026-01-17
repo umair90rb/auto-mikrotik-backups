@@ -76,8 +76,9 @@ def scheduled_backup_job():
         print("[Scheduler] No routers configured")
         return
 
-    folder_id = settings.get('google_drive_folder_id', '')
+    folder_id = settings.get('google_drive_folder_id', '') or None  # Convert empty string to None
     delete_local = settings.get('delete_local_after_upload', False)
+    gdrive_authorized = gdrive_client.is_authorized()
 
     for router in routers:
         print(f"[Scheduler] Backing up {router.get('name', router.get('ip'))}")
@@ -86,8 +87,8 @@ def scheduled_backup_job():
         log_entry = result.to_dict()
         log_entry['triggered_by'] = 'scheduler'
 
-        # Upload to Google Drive if configured
-        if result.success and folder_id and result.local_files:
+        # Upload to Google Drive if authorized
+        if result.success and result.local_files and gdrive_authorized:
             drive_files = []
             drive_errors = []
             for local_file in result.local_files:
@@ -109,6 +110,15 @@ def scheduled_backup_job():
 
             if drive_files:
                 log_entry['drive_files'] = drive_files
+
+                # Delete old backups from Drive after successful upload
+                if result.local_files:
+                    filename = os.path.basename(result.local_files[0])
+                    router_identity = '-'.join(filename.split('-')[:-1])
+                    if router_identity:
+                        gdrive_client.delete_old_backups(router_identity, folder_id, keep_latest=2)
+                        print(f"[Scheduler] Cleaned up old backups for {router_identity}")
+
             if drive_errors:
                 log_entry['drive_errors'] = drive_errors
             if drive_files and delete_local:

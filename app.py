@@ -298,11 +298,11 @@ def backup_single(router_id):
     log_entry = result.to_dict()
     log_entry['triggered_by'] = 'manual'
 
-    # Upload to Google Drive if configured
+    # Upload to Google Drive if authorized
     settings = load_settings()
-    folder_id = settings.get('google_drive_folder_id', '')
+    folder_id = settings.get('google_drive_folder_id', '') or None  # Convert empty string to None
 
-    if result.success and folder_id and result.local_files:
+    if result.success and result.local_files and gdrive_client.is_authorized():
         drive_files = []
         drive_errors = []
         for local_file in result.local_files:
@@ -323,6 +323,16 @@ def backup_single(router_id):
         if drive_files:
             log_entry['drive_files'] = drive_files
             flash(f'{len(drive_files)} file(s) uploaded to Google Drive', 'success')
+
+            # Delete old backups from Drive after successful upload
+            # Extract router identity from filename (format: identity-timestamp.ext)
+            if result.local_files:
+                filename = os.path.basename(result.local_files[0])
+                # Remove timestamp and extension to get identity
+                router_identity = '-'.join(filename.split('-')[:-1])
+                if router_identity:
+                    gdrive_client.delete_old_backups(router_identity, folder_id, keep_latest=2)
+
         if drive_errors:
             log_entry['drive_errors'] = drive_errors
             flash(f'Some uploads failed: {drive_errors}', 'error')
@@ -349,8 +359,9 @@ def backup_all():
         return redirect(url_for('dashboard'))
 
     settings = load_settings()
-    folder_id = settings.get('google_drive_folder_id', '')
+    folder_id = settings.get('google_drive_folder_id', '') or None  # Convert empty string to None
     delete_local = settings.get('delete_local_after_upload', False)
+    gdrive_authorized = gdrive_client.is_authorized()
 
     success_count = 0
     fail_count = 0
@@ -363,8 +374,8 @@ def backup_all():
         if result.success:
             success_count += 1
 
-            # Upload to Google Drive
-            if folder_id and result.local_files:
+            # Upload to Google Drive if authorized
+            if result.local_files and gdrive_authorized:
                 drive_files = []
                 drive_errors = []
                 for local_file in result.local_files:
@@ -382,6 +393,14 @@ def backup_all():
 
                 if drive_files:
                     log_entry['drive_files'] = drive_files
+
+                    # Delete old backups from Drive after successful upload
+                    if result.local_files:
+                        filename = os.path.basename(result.local_files[0])
+                        router_identity = '-'.join(filename.split('-')[:-1])
+                        if router_identity:
+                            gdrive_client.delete_old_backups(router_identity, folder_id, keep_latest=2)
+
                 if drive_errors:
                     log_entry['drive_errors'] = drive_errors
                 if drive_files and delete_local:

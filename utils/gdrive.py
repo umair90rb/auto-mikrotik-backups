@@ -280,6 +280,71 @@ class GoogleDriveClient:
         except Exception as e:
             return False, f"Failed to delete file: {str(e)}"
 
+    def find_router_backups(self, router_identity, folder_id=None):
+        """
+        Find existing backup files for a router by identity name.
+
+        Args:
+            router_identity: Router identity name (prefix of backup filenames)
+            folder_id: Google Drive folder ID (optional)
+
+        Returns:
+            tuple: (success: bool, list of files or error_message)
+        """
+        success, error = self.initialize()
+        if not success:
+            return False, error
+
+        try:
+            # Search for files starting with router identity
+            query = f"name contains '{router_identity}-' and trashed = false"
+            if folder_id:
+                query += f" and '{folder_id}' in parents"
+
+            results = self.service.files().list(
+                q=query,
+                pageSize=100,
+                fields="files(id, name, createdTime)",
+                orderBy="createdTime desc"
+            ).execute()
+
+            files = results.get('files', [])
+            return True, files
+
+        except Exception as e:
+            return False, f"Failed to find backups: {str(e)}"
+
+    def delete_old_backups(self, router_identity, folder_id=None, keep_latest=0):
+        """
+        Delete old backup files for a router, keeping only the latest ones.
+
+        Args:
+            router_identity: Router identity name
+            folder_id: Google Drive folder ID (optional)
+            keep_latest: Number of latest backups to keep (0 = delete all old)
+
+        Returns:
+            tuple: (success: bool, count of deleted files or error_message)
+        """
+        success, files = self.find_router_backups(router_identity, folder_id)
+        if not success:
+            return False, files  # files contains error message
+
+        if not files:
+            return True, 0
+
+        # Sort by created time descending (newest first)
+        files_to_delete = files[keep_latest:] if keep_latest > 0 else files
+
+        deleted_count = 0
+        for file in files_to_delete:
+            success, _ = self.delete_file(file['id'])
+            if success:
+                deleted_count += 1
+                print(f"[Google Drive] Deleted old backup: {file['name']}")
+
+        return True, deleted_count
+
     def test_connection(self, folder_id=None):
         """
         Test Google Drive connection.
