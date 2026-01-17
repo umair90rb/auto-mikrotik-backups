@@ -124,6 +124,15 @@ body {
     background-color: #f85149;
 }
 
+.btn-info {
+    background-color: #1f6feb;
+    color: white;
+}
+
+.btn-info:hover {
+    background-color: #388bfd;
+}
+
 .btn-sm {
     padding: 0.25rem 0.5rem;
     font-size: 0.75rem;
@@ -140,6 +149,12 @@ body {
 }
 
 /* Tables */
+.table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
 .table {
     width: 100%;
     background: #161b22;
@@ -147,6 +162,7 @@ body {
     overflow: hidden;
     border: 1px solid #30363d;
     border-collapse: collapse;
+    min-width: 600px;
 }
 
 .table th,
@@ -184,6 +200,22 @@ body {
 
 .table .actions form {
     display: inline;
+}
+
+/* Action buttons container */
+.action-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    align-items: center;
+}
+
+.action-buttons form {
+    display: inline-flex;
+}
+
+.backup-time {
+    font-size: 0.85rem;
 }
 
 /* Alerts */
@@ -510,16 +542,92 @@ h2 {
         align-items: flex-start;
     }
 
+    .header-actions {
+        flex-wrap: wrap;
+        width: 100%;
+    }
+
+    .header-actions .btn,
+    .header-actions form {
+        flex: 1 1 calc(50% - 0.25rem);
+        min-width: 0;
+    }
+
+    .header-actions .btn {
+        text-align: center;
+        padding: 0.5rem 0.25rem;
+        font-size: 0.8rem;
+    }
+
     .form-row {
         flex-direction: column;
     }
 
     .table {
         font-size: 0.875rem;
+        min-width: 500px;
     }
 
     .table th,
     .table td {
         padding: 0.75rem 0.5rem;
+    }
+
+    .hide-mobile {
+        display: none;
+    }
+
+    .action-buttons {
+        gap: 0.2rem;
+    }
+
+    .action-buttons .btn-sm {
+        padding: 0.2rem 0.4rem;
+        font-size: 0.7rem;
+    }
+
+    .countdown-box {
+        flex-direction: column;
+        text-align: center;
+        padding: 0.5rem 1rem;
+    }
+
+    .countdown-label {
+        margin-right: 0;
+        margin-bottom: 0.25rem;
+        font-size: 0.8rem;
+    }
+
+    .countdown-timer {
+        font-size: 1.25rem;
+    }
+
+    .backup-time {
+        font-size: 0.75rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .container {
+        padding: 1rem;
+    }
+
+    .table {
+        min-width: 400px;
+    }
+
+    .action-buttons .btn-sm {
+        padding: 0.15rem 0.3rem;
+        font-size: 0.65rem;
+    }
+
+    .header-actions .btn,
+    .header-actions form {
+        flex: 1 1 100%;
+    }
+
+    .header-actions .btn {
+        font-size: 0.85rem;
+        padding: 0.6rem 0.5rem;
     }
 }

@@ -11,6 +11,9 @@
                 Backup All
             </button>
         </form>
+        <a href="{{ url_for('download_all_backups') }}" class="btn btn-secondary" {% if not routers %}style="pointer-events: none; opacity: 0.5;"{% endif %}>
+            Download All
+        </a>
         <a href="{{ url_for('add_router') }}" class="btn btn-primary">Add Router</a>
         <a href="{{ url_for('bulk_upload') }}" class="btn btn-secondary">Bulk Upload</a>
     </div>
@@ -32,58 +35,65 @@
 </div>
 
 {% if routers %}
-<table class="table">
-    <thead>
-        <tr>
-            <th>Name</th>
-            <th>IP Address</th>
-            <th>Username</th>
-            <th>Ports</th>
-            <th>Last Backup</th>
-            <th>Status</th>
-            <th>Actions</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for router in routers %}
-        {% set last_backup = last_backups.get(router.id) %}
-        <tr>
-            <td>{{ router.name }}</td>
-            <td>{{ router.ip }}</td>
-            <td>{{ router.username }}</td>
-            <td>API: {{ router.api_port }}, FTP: {{ router.ftp_port }}</td>
-            <td>
-                {% if last_backup %}
-                {{ last_backup.timestamp[:19].replace('T', ' ') }}
-                {% else %}
-                Never
-                {% endif %}
-            </td>
-            <td>
-                {% if last_backup %}
-                <span class="badge badge-{{ 'success' if last_backup.success else 'error' }}">
-                    {{ 'Success' if last_backup.success else 'Failed' }}
-                </span>
-                {% else %}
-                <span class="badge badge-secondary">-</span>
-                {% endif %}
-            </td>
-            <td class="actions">
-                <form method="POST" action="{{ url_for('backup_single', router_id=router.id) }}" style="display: inline;">
-                    <button type="submit" class="btn btn-sm btn-success">Backup</button>
-                </form>
-                <form method="POST" action="{{ url_for('test_router', router_id=router.id) }}" style="display: inline;">
-                    <button type="submit" class="btn btn-sm btn-secondary">Test</button>
-                </form>
-                <a href="{{ url_for('edit_router', router_id=router.id) }}" class="btn btn-sm btn-secondary">Edit</a>
-                <form method="POST" action="{{ url_for('delete_router', router_id=router.id) }}" style="display: inline;" onsubmit="return confirm('Delete this router?');">
-                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
-                </form>
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+<div class="table-responsive">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>IP Address</th>
+                <th class="hide-mobile">Username</th>
+                <th class="hide-mobile">Ports</th>
+                <th>Last Backup</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for router in routers %}
+            {% set last_backup = last_backups.get(router.id) %}
+            <tr>
+                <td data-label="Name">{{ router.name }}</td>
+                <td data-label="IP">{{ router.ip }}</td>
+                <td data-label="Username" class="hide-mobile">{{ router.username }}</td>
+                <td data-label="Ports" class="hide-mobile">API: {{ router.api_port }}, FTP: {{ router.ftp_port }}</td>
+                <td data-label="Last Backup">
+                    {% if last_backup %}
+                    <span class="backup-time">{{ last_backup.timestamp[:19].replace('T', ' ') }}</span>
+                    {% else %}
+                    Never
+                    {% endif %}
+                </td>
+                <td data-label="Status">
+                    {% if last_backup %}
+                    <span class="badge badge-{{ 'success' if last_backup.success else 'error' }}">
+                        {{ 'Success' if last_backup.success else 'Failed' }}
+                    </span>
+                    {% else %}
+                    <span class="badge badge-secondary">-</span>
+                    {% endif %}
+                </td>
+                <td class="actions" data-label="Actions">
+                    <div class="action-buttons">
+                        <form method="POST" action="{{ url_for('backup_single', router_id=router.id) }}">
+                            <button type="submit" class="btn btn-sm btn-success" title="Backup">Backup</button>
+                        </form>
+                        {% if last_backup and last_backup.drive_files %}
+                        <a href="{{ url_for('download_backup', router_id=router.id) }}" class="btn btn-sm btn-info" title="Download">Download</a>
+                        {% endif %}
+                        <form method="POST" action="{{ url_for('test_router', router_id=router.id) }}">
+                            <button type="submit" class="btn btn-sm btn-secondary" title="Test">Test</button>
+                        </form>
+                        <a href="{{ url_for('edit_router', router_id=router.id) }}" class="btn btn-sm btn-secondary" title="Edit">Edit</a>
+                        <form method="POST" action="{{ url_for('delete_router', router_id=router.id) }}" onsubmit="return confirm('Delete this router?');">
+                            <button type="submit" class="btn btn-sm btn-danger" title="Delete">Delete</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
 {% else %}
 <div class="empty-state">
     <p>No routers configured yet.</p>

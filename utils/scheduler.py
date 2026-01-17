@@ -116,7 +116,7 @@ def scheduled_backup_job():
                     filename = os.path.basename(result.local_files[0])
                     router_identity = '-'.join(filename.split('-')[:-1])
                     if router_identity:
-                        gdrive_client.delete_old_backups(router_identity, folder_id, keep_latest=2)
+                        gdrive_client.delete_old_backups(router_identity, folder_id, keep_latest=12)
                         print(f"[Scheduler] Cleaned up old backups for {router_identity}")
 
             if drive_errors:

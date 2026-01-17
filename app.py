@@ -6,10 +6,12 @@ import os
 # Allow OAuth2 over HTTP for local development
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, Response
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 import json
 import uuid
+import zipfile
+import io
 
 import config
 from utils.backup import create_backup, test_connection
@@ -331,7 +333,7 @@ def backup_single(router_id):
                 # Remove timestamp and extension to get identity
                 router_identity = '-'.join(filename.split('-')[:-1])
                 if router_identity:
-                    gdrive_client.delete_old_backups(router_identity, folder_id, keep_latest=2)
+                    gdrive_client.delete_old_backups(router_identity, folder_id, keep_latest=12)
 
         if drive_errors:
             log_entry['drive_errors'] = drive_errors
@@ -399,7 +401,7 @@ def backup_all():
                         filename = os.path.basename(result.local_files[0])
                         router_identity = '-'.join(filename.split('-')[:-1])
                         if router_identity:
-                            gdrive_client.delete_old_backups(router_identity, folder_id, keep_latest=2)
+                            gdrive_client.delete_old_backups(router_identity, folder_id, keep_latest=12)
 
                 if drive_errors:
                     log_entry['drive_errors'] = drive_errors
@@ -490,6 +492,112 @@ def gdrive_revoke():
 def backups():
     logs = load_backup_log()
     return render_template('backups.html', logs=logs)
+
+
+@app.route('/download/<router_id>')
+@login_required
+def download_backup(router_id):
+    """Download the last backup for a specific router from Google Drive."""
+    router = get_router_by_id(router_id)
+    if router is None:
+        flash('Router not found', 'error')
+        return redirect(url_for('dashboard'))
+
+    if not gdrive_client.is_authorized():
+        flash('Google Drive not authorized', 'error')
+        return redirect(url_for('dashboard'))
+
+    # Find the last backup for this router
+    backup_log = load_backup_log()
+    last_backup = None
+    for log in backup_log:
+        if log.get('router_id') == router_id and log.get('success') and log.get('drive_files'):
+            last_backup = log
+
+    if not last_backup or not last_backup.get('drive_files'):
+        flash(f'No backup found for {router["name"]}', 'error')
+        return redirect(url_for('dashboard'))
+
+    # Download the first file from drive_files
+    drive_file = last_backup['drive_files'][0]
+    file_id = drive_file.get('id')
+
+    if not file_id:
+        flash('Backup file ID not found', 'error')
+        return redirect(url_for('dashboard'))
+
+    success, result = gdrive_client.download_file(file_id)
+    if not success:
+        flash(f'Download failed: {result}', 'error')
+        return redirect(url_for('dashboard'))
+
+    file_content, filename = result
+    return Response(
+        file_content,
+        mimetype='application/octet-stream',
+        headers={'Content-Disposition': f'attachment; filename="{filename}"'}
+    )
+
+
+@app.route('/download/all')
+@login_required
+def download_all_backups():
+    """Download all last backups as a ZIP file from Google Drive."""
+    if not gdrive_client.is_authorized():
+        flash('Google Drive not authorized', 'error')
+        return redirect(url_for('dashboard'))
+
+    routers = load_routers()
+    backup_log = load_backup_log()
+
+    # Get last successful backup with drive files for each router
+    last_backups = {}
+    for log in backup_log:
+        router_id = log.get('router_id')
+        if router_id and log.get('success') and log.get('drive_files'):
+            last_backups[router_id] = log
+
+    if not last_backups:
+        flash('No backups available to download', 'error')
+        return redirect(url_for('dashboard'))
+
+    # Create a ZIP file in memory
+    zip_buffer = io.BytesIO()
+    downloaded_count = 0
+    errors = []
+
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        for router_id, backup in last_backups.items():
+            drive_files = backup.get('drive_files', [])
+            for drive_file in drive_files:
+                file_id = drive_file.get('id')
+                if not file_id:
+                    continue
+
+                success, result = gdrive_client.download_file(file_id)
+                if success:
+                    file_content, filename = result
+                    zip_file.writestr(filename, file_content)
+                    downloaded_count += 1
+                else:
+                    errors.append(f"{drive_file.get('name', 'unknown')}: {result}")
+
+    if downloaded_count == 0:
+        flash('No files could be downloaded', 'error')
+        return redirect(url_for('dashboard'))
+
+    if errors:
+        flash(f'Downloaded {downloaded_count} files, {len(errors)} failed', 'warning')
+
+    zip_buffer.seek(0)
+    from datetime import datetime
+    timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+
+    return Response(
+        zip_buffer.getvalue(),
+        mimetype='application/zip',
+        headers={'Content-Disposition': f'attachment; filename="mikrotik-backups-{timestamp}.zip"'}
+    )
 
 
 # Initialize scheduler on startup

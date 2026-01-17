@@ -12,7 +12,8 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload
+from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
+import io
 import config
 
 # OAuth2 scopes
@@ -279,6 +280,66 @@ class GoogleDriveClient:
             return True, "File deleted successfully"
         except Exception as e:
             return False, f"Failed to delete file: {str(e)}"
+
+    def download_file(self, file_id):
+        """
+        Download a file from Google Drive.
+
+        Args:
+            file_id: Google Drive file ID
+
+        Returns:
+            tuple: (success: bool, (file_content, filename) or error_message)
+        """
+        success, error = self.initialize()
+        if not success:
+            return False, error
+
+        try:
+            # Get file metadata for the filename
+            file_metadata = self.service.files().get(
+                fileId=file_id,
+                fields='name'
+            ).execute()
+            filename = file_metadata.get('name', 'backup')
+
+            # Download file content
+            request = self.service.files().get_media(fileId=file_id)
+            file_content = io.BytesIO()
+            downloader = MediaIoBaseDownload(file_content, request)
+
+            done = False
+            while not done:
+                status, done = downloader.next_chunk()
+
+            file_content.seek(0)
+            return True, (file_content.read(), filename)
+
+        except Exception as e:
+            return False, f"Download failed: {str(e)}"
+
+    def get_file_info(self, file_id):
+        """
+        Get file information from Google Drive.
+
+        Args:
+            file_id: Google Drive file ID
+
+        Returns:
+            tuple: (success: bool, file_info or error_message)
+        """
+        success, error = self.initialize()
+        if not success:
+            return False, error
+
+        try:
+            file_info = self.service.files().get(
+                fileId=file_id,
+                fields='id, name, size, createdTime, webViewLink'
+            ).execute()
+            return True, file_info
+        except Exception as e:
+            return False, f"Failed to get file info: {str(e)}"
 
     def find_router_backups(self, router_identity, folder_id=None):
         """
